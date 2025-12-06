@@ -1,3 +1,5 @@
+# src/content_generator.py
+
 import json
 import logging
 from typing import Dict, List, Optional
@@ -79,7 +81,6 @@ class ContentGenerator:
                 city_info = {
                     'city': data['city'],
                     'state': data['state'],
-                    'coordinates': data['coordinates'],
                     'forecast': data['forecast']['properties']['periods'][:6] if data.get('forecast') and data['forecast'].get('properties') else [],
                     'hourly': data['hourly']['properties']['periods'][:12] if data.get('hourly') and data['hourly'].get('properties') else [],
                     'alerts': data['alerts']['features'][:3] if data.get('alerts') and data['alerts'].get('features') else []
@@ -300,18 +301,30 @@ class ContentGenerator:
             # Add weather forecast schema for each city
             weather_forecasts = []
             for data in weather_data:
-                if data.get('city') and data.get('state') and data.get('coordinates'):
+                if data.get('city') and data.get('state'):
+                    # Get coordinates from zones.py
+                    from zones import get_city_info
+                    city_info = get_city_info(zone_name, data['city'])
+                    
+                    if city_info:
+                        lat_lon = city_info.get('lat_lon', '').split(',')
+                        lat = lat_lon[0] if len(lat_lon) > 0 else 0
+                        lon = lat_lon[1] if len(lat_lon) > 1 else 0
+                    else:
+                        lat = 0
+                        lon = 0
+                    
                     forecast = {
                         "@type": "WeatherForecast",
-                        "name": f"{data['city']}, {data['state']} Weather Forecast",
+                        "name": f"{data['city']} Weather Forecast",
                         "datePublished": datetime.now().isoformat(),
                         "location": {
                             "@type": "Place",
-                            "name": f"{data['city']}, {data['state']}",
+                            "name": f"{data['city']}",
                             "geo": {
                                 "@type": "GeoCoordinates",
-                                "latitude": data['coordinates'][0],
-                                "longitude": data['coordinates'][1]
+                                "latitude": lat,
+                                "longitude": lon
                             }
                         }
                     }
