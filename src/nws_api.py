@@ -1,8 +1,9 @@
 import requests
 import json
+import logging
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime
-import logging
+import time
 
 from config import Config
 
@@ -18,22 +19,23 @@ class NWSAPI:
             'API-Key': self.api_key,
             'Accept': 'application/json'
         }
+        self.timeout = 10  # Timeout in seconds for API requests
     
     def get_city_coordinates(self, city: str, state: str) -> Optional[Tuple[float, float]]:
         """Get latitude and longitude for a city"""
         try:
-            # First, get the grid point for the city
+            # First, try to get the grid point for the city
             url = f"{self.base_url}/points/{city},{state}"
-            response = requests.get(url, headers=self.headers)
+            response = requests.get(url, headers=self.headers, timeout=self.timeout)
             
             if response.status_code == 200:
                 data = response.json()
                 return (data['properties']['relativeLocation']['geometry']['coordinates'][1],
                         data['properties']['relativeLocation']['geometry']['coordinates'][0])
             else:
-                # Try alternative approach
+                # Try alternative approach using Open-Meteo API
                 url = f"https://geocoding-api.open-meteo.com/v1/search?name={city}&count=1&country=US"
-                response = requests.get(url)
+                response = requests.get(url, timeout=self.timeout)
                 
                 if response.status_code == 200:
                     data = response.json()
@@ -46,31 +48,12 @@ class NWSAPI:
             logger.error(f"Error getting coordinates for {city}, {state}: {str(e)}")
             return None
     
-    def get_weather_data(self, city: str, state: str) -> Optional[Dict]:
-        """Get current weather data for a city"""
+    def get_weather_data(self, city: str, state: str, grid_id: str, grid_x: int, grid_y: int) -> Optional[Dict]:
+        """Get current weather data for a city using pre-defined grid information"""
         try:
-            coordinates = self.get_city_coordinates(city, state)
-            if not coordinates:
-                return None
-            
-            lat, lon = coordinates
-            
-            # Get the grid point for these coordinates
-            url = f"{self.base_url}/points/{lat},{lon}"
-            response = requests.get(url, headers=self.headers)
-            
-            if response.status_code != 200:
-                logger.error(f"Failed to get grid point for {city}, {state}: {response.status_code}")
-                return None
-            
-            data = response.json()
-            grid_id = data['properties']['gridId']
-            grid_x = data['properties']['gridX']
-            grid_y = data['properties']['gridY']
-            
-            # Get the forecast
+            # Get the forecast using the provided grid information
             url = f"{self.base_url}/gridpoints/{grid_id}/{grid_x},{grid_y}/forecast"
-            response = requests.get(url, headers=self.headers)
+            response = requests.get(url, headers=self.headers, timeout=self.timeout)
             
             if response.status_code != 200:
                 logger.error(f"Failed to get forecast for {city}, {state}: {response.status_code}")
@@ -80,38 +63,31 @@ class NWSAPI:
             
             # Get the hourly forecast
             url = f"{self.base_url}/gridpoints/{grid_id}/{grid_x},{grid_y}/forecast/hourly"
-            response = requests.get(url, headers=self.headers)
+            response = requests.get(url, headers=self.headers, timeout=self.timeout)
             
             hourly_data = None
             if response.status_code == 200:
                 hourly_data = response.json()
             
-            # Get the observation stations
-            url = f"{self.base_url}/gridpoints/{grid_id}/{grid_x},{grid_y}/stations"
-            response = requests.get(url, headers=self.headers)
-            
-            stations_data = None
-            if response.status_code == 200:
-                stations_data = response.json()
-            
             # Get alerts
             url = f"{self.base_url}/alerts/active?area={state}"
-            response = requests.get(url, headers=self.headers)
+            response = requests.get(url, headers=self.headers, timeout=self.timeout)
             
             alerts_data = None
             if response.status_code == 200:
                 alerts_data = response.json()
             
-            # Get radar images
-            radar_images = self.get_radar_images(lat, lon)
+            # Get radar images (simplified to avoid the 'stationId' error)
+            radar_images = []
             
             return {
                 'city': city,
                 'state': state,
-                'coordinates': coordinates,
+                'grid_id': grid_id,
+                'grid_x': grid_x,
+                'grid_y': grid_y,
                 'forecast': forecast_data,
                 'hourly': hourly_data,
-                'stations': stations_data,
                 'alerts': alerts_data,
                 'radar_images': radar_images,
                 'last_updated': datetime.now().isoformat()
@@ -120,64 +96,26 @@ class NWSAPI:
             logger.error(f"Error getting weather data for {city}, {state}: {str(e)}")
             return None
     
-    def get_radar_images(self, lat: float, lon: float) -> List[Dict]:
-        """Get radar images for the specified coordinates"""
-        try:
-            # Get the nearest radar station
-            url = f"https://api.weather.gov/radar/stations"
-            response = requests.get(url, headers=self.headers)
-            
-            if response.status_code != 200:
-                logger.error(f"Failed to get radar stations: {response.status_code}")
-                return []
-            
-            data = response.json()
-            stations = data.get('features', [])
-            
-            # Find the nearest station (simplified - in production, calculate actual distance)
-            nearest_station = None
-            if stations:
-                nearest_station = stations[0]['properties']['stationId']
-            
-            if not nearest_station:
-                return []
-            
-            # Get radar images for the station
-            images = []
-            
-            # Get the latest radar image
-            url = f"https://api.weather.gov/radar/stations/{nearest_station}/images"
-            response = requests.get(url, headers=self.headers)
-            
-            if response.status_code == 200:
-                data = response.json()
-                for img in data.get('@graph', []):
-                    if img.get('@type') == 'RadarImage':
-                        images.append({
-                            'url': img.get('url'),
-                            'title': img.get('title'),
-                            'description': img.get('description'),
-                            'date': img.get('date')
-                        })
-            
-            return images
-        except Exception as e:
-            logger.error(f"Error getting radar images: {str(e)}")
-            return []
-    
     def get_zone_weather_data(self, zone_name: str) -> List[Dict]:
         """Get weather data for all cities in a zone"""
-        from zones import get_all_cities_in_zone
+        from zones import get_all_city_info_in_zone
         
-        cities = get_all_cities_in_zone(zone_name)
+        cities_info = get_all_city_info_in_zone(zone_name)
         weather_data = []
         
-        for city in cities:
-            # Extract state from city name (assuming format "City, State")
-            if ", " in city:
-                city_name, state = city.split(", ", 1)
-                data = self.get_weather_data(city_name, state)
-                if data:
-                    weather_data.append(data)
+        for city_info in cities_info:
+            city = city_info['city']
+            state = city['city'].split(', ')[1] if ', ' in city['city'] else ''
+            grid_id = city_info['grid_id']
+            grid_x = city_info['grid_x']
+            grid_y = city_info['grid_y']
+            
+            # Get weather data for this city
+            data = self.get_weather_data(city, state, grid_id, grid_x, grid_y)
+            if data:
+                weather_data.append(data)
+            
+            # Add a small delay to avoid hitting rate limits
+            time.sleep(0.5)
         
         return weather_data

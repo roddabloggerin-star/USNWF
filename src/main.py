@@ -46,6 +46,7 @@ def main():
         logger.info(f"Processing zone: {current_zone}")
         
         # Get weather data for the current zone
+        logger.info("Fetching weather data...")
         weather_data = nws_api.get_zone_weather_data(current_zone)
         
         if not weather_data:
@@ -55,6 +56,7 @@ def main():
         logger.info(f"Retrieved weather data for {len(weather_data)} cities in {current_zone}")
         
         # Generate the blog post
+        logger.info("Generating blog post...")
         blog_post = content_generator.generate_blog_post(current_zone, weather_data)
         
         if not blog_post:
@@ -64,13 +66,16 @@ def main():
         logger.info(f"Generated blog post with {blog_post['word_count']} words")
         
         # Format the blog post as HTML
+        logger.info("Formatting blog post as HTML...")
         html_content = format_blog_post_as_html(blog_post)
         
         # Save the blog post locally (for testing or backup)
+        logger.info("Saving blog post locally...")
         save_blog_post_locally(blog_post, html_content)
         
         # Publish to Blogger if configured
         if Config.PUBLISH_TO_BLOGGER and blogger_api:
+            logger.info("Publishing to Blogger...")
             labels = [current_zone, "weather", "forecast", "NWS"]
             labels.extend(blog_post['keywords'][:5])  # Add up to 5 keywords as labels
             
