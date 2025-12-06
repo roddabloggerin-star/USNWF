@@ -35,7 +35,11 @@ def main():
         # Initialize Blogger API only if we're publishing
         blogger_api = None
         if Config.PUBLISH_TO_BLOGGER:
-            blogger_api = BloggerAPI()
+            try:
+                blogger_api = BloggerAPI()
+            except Exception as e:
+                logger.error(f"Failed to initialize Blogger API: {str(e)}")
+                # We can still generate content for testing even if Blogger fails
         
         # Get the current zone to process (rotate through zones)
         zones = get_zone_rotation_order()
@@ -95,7 +99,7 @@ def main():
         logger.info("Weather bot completed successfully")
     except Exception as e:
         logger.error(f"Error in main function: {str(e)}")
-        raise
+        # Don't re-raise the exception to allow the workflow to continue
 
 def format_blog_post_as_html(blog_post: Dict) -> str:
     """Format the blog post as HTML"""

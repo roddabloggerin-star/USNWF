@@ -1,6 +1,5 @@
 import logging
-from typing import Dict, List
-from datetime import datetime
+from typing import Dict, List, Union
 
 logger = logging.getLogger(__name__)
 
@@ -21,11 +20,10 @@ class SEOOptimizer:
             if len(optimized_title) > 60:
                 # Truncate the main condition if needed
                 max_condition_length = 60 - len(f"{city}, {state} Weather Update:  ({current_date}, {current_time})")
-                if max_condition_length > 10:  # Only truncate if we have enough space for a meaningful condition
+                if max_condition_length > 10:  # Only truncate if we have reasonable space
                     optimized_title = f"{city}, {state} Weather Update: {main_condition[:max_condition_length-3]}... ({current_date}, {current_time})"
                 else:
-                    # If we don't have enough space, use a shorter format
-                    optimized_title = f"{city} Weather: {main_condition[:20]}... ({current_date})"
+                    optimized_title = f"{city}, {state} Weather Update: {main_condition} ({current_date}, {current_time})"
             
             return optimized_title
         except Exception as e:
@@ -44,14 +42,9 @@ class SEOOptimizer:
                 if len(meta_description) + len(f" {city}, {state}") < 160:
                     meta_description += f" {city}, {state}"
                 else:
-                    # If we don't have enough space, replace part of the description
-                    words = meta_description.split()
-                    words.insert(0, f"{city},")
-                    if len(" ".join(words)) < 160:
-                        meta_description = " ".join(words)
-                    else:
-                        # If still too long, just add the city at the beginning
-                        meta_description = f"{city}, {state} weather forecast and conditions."
+                    # If we don't have space, just add the city
+                    if len(meta_description) + len(f" {city}") < 160:
+                        meta_description += f" {city}"
             
             return meta_description
         except Exception as e:
@@ -90,24 +83,21 @@ class SEOOptimizer:
             nearby_cities = []
             
             # Find the current city in the list
-            current_city_index = None
-            for i, c in enumerate(zone_cities):
-                if city in c:
-                    current_city_index = i
-                    break
-            
-            # Get the cities before and after the current city
-            if current_city_index is not None:
-                for offset in [-2, -1, 1, 2]:  # Check up to 2 cities before and after
-                    index = current_city_index + offset
-                    if 0 <= index < len(zone_cities):
-                        nearby_city = zone_cities[index]
-                        if ", " in nearby_city:
-                            city_name, city_state = nearby_city.split(", ", 1)
-                            nearby_cities.append({
-                                "title": f"{city_name}, {city_state}",
-                                "url": f"/city/{city_name.lower().replace(' ', '-')}-{city_state.lower()}"
-                            })
+            if city in zone_cities:
+                current_city_index = zone_cities.index(city)
+                
+                # Get cities before and after the current city
+                if current_city_index > 0:
+                    nearby_cities.append({
+                        "title": zone_cities[current_city_index - 1],
+                        "url": f"/city/{zone_cities[current_city_index - 1].lower().replace(' ', '-')}-{state.lower()}"
+                    })
+                
+                if current_city_index < len(zone_cities) - 1:
+                    nearby_cities.append({
+                        "title": zone_cities[current_city_index + 1],
+                        "url": f"/city/{zone_cities[current_city_index + 1].lower().replace(' ', '-')}-{state.lower()}"
+                    })
             
             # Link to other zones
             other_zones = []
@@ -189,51 +179,13 @@ class SEOOptimizer:
                 
                 schema["mainEntity"] = faq_schema
             
-            # Add breadcrumb schema
-            zone_name = blog_post.get('zone_name', '')
-            breadcrumb_schema = {
-                "@context": "https://schema.org",
-                "@type": "BreadcrumbList",
-                "itemListElement": [
-                    {
-                        "@type": "ListItem",
-                        "position": 1,
-                        "name": "Home",
-                        "item": f"{Config.CANONICAL_URL}/"
-                    },
-                    {
-                        "@type": "ListItem",
-                        "position": 2,
-                        "name": "USA Weather",
-                        "item": f"{Config.CANONICAL_URL}/usa-weather-today"
-                    },
-                    {
-                        "@type": "ListItem",
-                        "position": 3,
-                        "name": f"{zone_name} Zone",
-                        "item": f"{Config.CANONICAL_URL}/zone/{zone_name.lower().replace(' ', '-')}"
-                    },
-                    {
-                        "@type": "ListItem",
-                        "position": 4,
-                        "name": blog_post.get('title', ''),
-                        "item": f"{Config.CANONICAL_URL}/post/{blog_post.get('id', '')}"
-                    }
-                ]
-            }
-            
-            # Convert schemas to JSON strings
-            article_schema_json = json.dumps(schema, indent=2)
-            breadcrumb_schema_json = json.dumps(breadcrumb_schema, indent=2)
+            # Convert schema to JSON string
+            schema_json = json.dumps(schema, indent=2)
             
             # Return the schema markup as HTML script tags
             return f"""
             <script type="application/ld+json">
-            {article_schema_json}
-            </script>
-            
-            <script type="application/ld+json">
-            {breadcrumb_schema_json}
+            {schema_json}
             </script>
             """
         except Exception as e:

@@ -99,25 +99,29 @@ class NWSAPI:
             return None
     
     def get_zone_weather_data(self, zone_name: str) -> List[Dict]:
-        """Get weather data for all cities in a zone"""
-        from zones import get_all_city_info_in_zone
+    """Get weather data for all cities in a zone"""
+    from zones import get_all_city_info_in_zone
+    
+    cities_info = get_all_city_info_in_zone(zone_name)
+    weather_data = []
+    
+    for city_info in cities_info:
+        city = city_info['city']
+        state = city.split(', ')[1] if ', ' in city else ''
+        grid_id = city_info['grid_id']
+        grid_x = city_info['grid_x']
+        grid_y = city_info['grid_y']
         
-        cities_info = get_all_city_info_in_zone(zone_name)
-        weather_data = []
-        
-        for city_info in cities_info:
-            city = city_info['city']
-            state = city.split(', ')[1] if ', ' in city else ''
-            grid_id = city_info['grid_id']
-            grid_x = city_info['grid_x']
-            grid_y = city_info['grid_y']
-            
-            # Get weather data for this city
+        # Get weather data for this city
+        try:
             data = self.get_weather_data(city, state, grid_id, grid_x, grid_y)
             if data:
                 weather_data.append(data)
-            
-            # Add a small delay to avoid hitting rate limits
-            time.sleep(0.5)
+        except Exception as e:
+            logger.error(f"Error getting weather data for {city}: {str(e)}")
+            # Continue with other cities even if one fails
         
-        return weather_data
+        # Add a small delay to avoid hitting rate limits
+        time.sleep(0.5)
+    
+    return weather_data
