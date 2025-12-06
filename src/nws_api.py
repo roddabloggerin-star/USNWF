@@ -99,7 +99,7 @@ class NWSAPI:
             return None
     
     def get_zone_weather_data(self, zone_name: str) -> List[Dict]:
-    """Get weather data for all cities in a zone"""
+        """Get weather data for all cities in a zone"""
     from zones import get_all_city_info_in_zone
     
     cities_info = get_all_city_info_in_zone(zone_name)
