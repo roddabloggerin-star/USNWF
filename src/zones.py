@@ -9,6 +9,8 @@ its name, coordinates, and the specific NWS grid data needed to fetch
 its forecast.
 """
 
+from typing import Union
+
 # Zone definitions with detailed city information
 ZONES = {
     "Eastern Zone": {
@@ -142,7 +144,7 @@ def get_all_city_info_in_zone(zone_name: str) -> list[dict]:
     return ZONES.get(zone_name, {}).get('cities', [])
 
 
-def get_city_info(zone_name: str, city_name: str) -> dict | None:
+def get_city_info(zone_name: str, city_name: str) -> Union[dict, None]:
     """
     Finds the detailed information dictionary for a specific city within a zone.
 
