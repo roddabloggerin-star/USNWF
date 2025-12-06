@@ -1,3 +1,5 @@
+# src/nws_api.py
+
 import requests
 import json
 import logging
@@ -24,7 +26,7 @@ class NWSAPI:
     def get_city_coordinates(self, city: str, state: str) -> Optional[Tuple[float, float]]:
         """Get latitude and longitude for a city"""
         try:
-            # First, try to get the grid point for the city
+            # First, try to get grid point for city
             url = f"{self.base_url}/points/{city},{state}"
             response = requests.get(url, headers=self.headers, timeout=self.timeout)
             
@@ -51,7 +53,7 @@ class NWSAPI:
     def get_weather_data(self, city: str, state: str, grid_id: str, grid_x: int, grid_y: int) -> Optional[Dict]:
         """Get current weather data for a city using pre-defined grid information"""
         try:
-            # Get the forecast using the provided grid information
+            # Get forecast using provided grid information
             url = f"{self.base_url}/gridpoints/{grid_id}/{grid_x},{grid_y}/forecast"
             response = requests.get(url, headers=self.headers, timeout=self.timeout)
             
@@ -61,7 +63,7 @@ class NWSAPI:
             
             forecast_data = response.json()
             
-            # Get the hourly forecast
+            # Get hourly forecast
             url = f"{self.base_url}/gridpoints/{grid_id}/{grid_x},{grid_y}/forecast/hourly"
             response = requests.get(url, headers=self.headers, timeout=self.timeout)
             
@@ -77,7 +79,7 @@ class NWSAPI:
             if response.status_code == 200:
                 alerts_data = response.json()
             
-            # Get radar images (simplified to avoid the 'stationId' error)
+            # Get radar images (simplified to avoid 'stationId' error)
             radar_images = []
             
             return {
@@ -105,7 +107,7 @@ class NWSAPI:
         
         for city_info in cities_info:
             city = city_info['city']
-            state = city['city'].split(', ')[1] if ', ' in city['city'] else ''
+            state = city.split(', ')[1] if ', ' in city else ''
             grid_id = city_info['grid_id']
             grid_x = city_info['grid_x']
             grid_y = city_info['grid_y']
