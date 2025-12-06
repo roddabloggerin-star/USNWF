@@ -429,7 +429,7 @@ class ContentGenerator:
             return []
     
     def _generate_faqs(self, weather_data: List[Dict]) -> List[Dict]:
-        """Generate FAQs based on the weather data"""
+        """Generate FAQs based on the weather data."""
         try:
             # Create a prompt for FAQ generation
             prompt = f"""
@@ -447,10 +447,10 @@ class ContentGenerator:
             
             Example:
             [
-                {
+                {{
                     "question": "Will it rain today in Boston?",
                     "answer": "Based on the current forecast, there is a 40% chance of rain in Boston this afternoon."
-                },
+                }},
                 ...
             ]
             """
